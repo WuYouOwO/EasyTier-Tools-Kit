@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================= #
-# EasyTier Linux 一键部署、持续监控与运维管理一体化工具箱 (修复版)
+# EasyTier Linux 一键部署、无闪烁监控与运维管理一体化工具箱
 # 支持架构: x86_64 / amd64, aarch64 / arm64
 # ================================================================= #
 
@@ -122,7 +122,7 @@ install_easytier() {
     ln -sf "$INSTALL_DIR/easytier-core" /usr/bin/easytier-core 2>/dev/null
     ln -sf "$INSTALL_DIR/easytier-cli" /usr/bin/easytier-cli 2>/dev/null
 
-    # 【修复点】处理 curl | bash 管道运行时的菜单脚本注册
+    # 处理 curl | bash 管道运行下的菜单脚本注册
     MENU_SCRIPT="${INSTALL_DIR}/easytier-menu.sh"
     if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "sh" ]; then
         cp -f "$0" "$MENU_SCRIPT"
@@ -133,7 +133,7 @@ install_easytier() {
 
     chmod +x "$MENU_SCRIPT"
 
-    # 创建快捷命令软链接（同时兼容 /usr/local/bin 与 /usr/bin）
+    # 创建快捷命令软链接
     ln -sf "$MENU_SCRIPT" /usr/local/bin/easytier-menu
     ln -sf "$MENU_SCRIPT" /usr/local/bin/easytier
     ln -sf "$MENU_SCRIPT" /usr/bin/easytier-menu 2>/dev/null
@@ -261,7 +261,7 @@ EOF
     echo -e "${GREEN}[+] Systemd 服务已就绪！${PLAIN}"
 }
 
-# 📊 功能：动态监控看板
+# 📊 功能：动态监控看板 (零闪烁丝滑刷新)
 monitor_dashboard() {
     if ! systemctl is-active --quiet easytier; then
         echo -e "${RED}[!] EasyTier 服务未在运行，无法获取实时状态。${PLAIN}"
@@ -269,30 +269,46 @@ monitor_dashboard() {
         return
     fi
 
+    # 清屏一次初始化，隐藏终端光标防止闪烁跳动
+    clear
+    printf "\033[?25l"
+
+    # 捕获异常或退出信号，恢复光标
+    trap 'printf "\033[?25h"; trap - INT TERM EXIT; return' INT TERM EXIT
+
     while true; do
-        clear
-        echo -e "${BLUE}========================================================================${PLAIN}"
+        # 光标归位至左上角 (0,0)，无清屏原位覆盖，彻底消除黑白闪烁
+        printf "\033[H"
+        
+        echo -e "${BLUE}========================================================================${PLAIN}\033[K"
         echo -e "          EasyTier 节点动态监控看板 (按 Ctrl+C 或输入 q 回车退出) "
         echo -e "         刷新时间: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo -e "${BLUE}========================================================================${PLAIN}"
+        echo -e "${BLUE}========================================================================${PLAIN}\033[K"
         
-        echo -e "${YELLOW}[本地节点信息]${PLAIN}"
+        echo -e "${YELLOW}[本地节点信息]${PLAIN}\033[K"
         easytier-cli node 2>/dev/null || echo "无法获取节点数据"
         echo ""
 
-        echo -e "${YELLOW}[对等节点 (Peer) 链路状态]${PLAIN}"
+        echo -e "${YELLOW}[对等节点 (Peer) 链路状态]${PLAIN}\033[K"
         easytier-cli peer 2>/dev/null || echo "无活动的 Peer 连接"
         echo ""
 
-        echo -e "${YELLOW}[虚拟网络路由表]${PLAIN}"
+        echo -e "${YELLOW}[虚拟网络路由表]${PLAIN}\033[K"
         easytier-cli route 2>/dev/null || echo "无活动路由"
-        echo -e "${BLUE}========================================================================${PLAIN}"
+        echo -e "${BLUE}========================================================================${PLAIN}\033[K"
+
+        # 擦除下方多余旧残影
+        printf "\033[J"
 
         read -t 3 -n 1 input
         if [[ "$input" =~ [Qq] ]]; then
             break
         fi
     done
+
+    # 恢复终端光标
+    printf "\033[?25h"
+    trap - INT TERM EXIT
 }
 
 # 🛡️ 功能：保活 Watchdog 脚本管理
