@@ -3,7 +3,7 @@
 # ================================================================= #
 #  EasyTier Linux 一键安装、引导配置与 Systemd 持久化脚本
 #  支持架构: x86_64, aarch64 (ARM64)
-#  修复版: 彻底解决 curl | bash 管道运行下的交互式 read 阻塞与变量报错问题
+#  更新: 采用用户指定的 https://hk.gh-proxy.org 作为国内首选镜像加速站
 # ================================================================= #
 
 # 终端颜色定义
@@ -23,7 +23,7 @@ fi
 echo -e "${BLUE}"
 echo "======================================================"
 echo "    EasyTier Linux 自动部署与引导配置一体化脚本       "
-echo "    作者: Gemini 3.6 或者 3.5 Falsh                            "
+echo "    作者: Gemini 3.5/3.6 Flash                            "
 echo "======================================================"
 echo -e "${PLAIN}"
 
@@ -55,13 +55,13 @@ GITHUB_URL="https://github.com/EasyTier/EasyTier/releases/download/${LATEST_VERS
 
 echo -e "${YELLOW}[?] 由于国内直接连接 GitHub 较慢，是否使用加速代理进行下载？${PLAIN}"
 echo "  1) 直连 GitHub 官方 (适合海外 VPS)"
-echo "  2) 使用 ghfast.top 加速代理 (推荐国内节点使用)"
+echo "  2) 使用 hk.gh-proxy.org 加速代理 (推荐国内节点使用)"
 read -r -p "请选择下载方式 [1-2] (默认: 2): " download_choice < /dev/tty
 download_choice=${download_choice:-2}
 
 # 使用字符串比较代替整数比较，防止类型转换报错
 if [ "$download_choice" = "2" ]; then
-    DOWNLOAD_URL="https://ghfast.top/${GITHUB_URL}"
+    DOWNLOAD_URL="https://hk.gh-proxy.org/${GITHUB_URL}"
 else
     DOWNLOAD_URL="${GITHUB_URL}"
 fi
