@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================= #
-# EasyTier Linux 一键部署、持续监控与运维管理一体化工具箱
+# EasyTier Linux 一键部署、持续监控与运维管理一体化工具箱 (修复版)
 # 支持架构: x86_64 / amd64, aarch64 / arm64
 # ================================================================= #
 
@@ -74,8 +74,10 @@ install_easytier() {
 
     if [ "$dl_choice" = "2" ]; then
         DOWNLOAD_URL="https://hk.gh-proxy.org/${GITHUB_URL}"
+        RAW_SCRIPT_URL="https://hk.gh-proxy.org/https://raw.githubusercontent.com/WuYouOwO/EasyTier-Tools-Kit/main/install.sh"
     else
         DOWNLOAD_URL="${GITHUB_URL}"
+        RAW_SCRIPT_URL="https://raw.githubusercontent.com/WuYouOwO/EasyTier-Tools-Kit/main/install.sh"
     fi
 
     TMP_ZIP="/tmp/${ZIP_NAME}"
@@ -117,13 +119,27 @@ install_easytier() {
 
     ln -sf "$INSTALL_DIR/easytier-core" /usr/local/bin/easytier-core
     ln -sf "$INSTALL_DIR/easytier-cli" /usr/local/bin/easytier-cli
+    ln -sf "$INSTALL_DIR/easytier-core" /usr/bin/easytier-core 2>/dev/null
+    ln -sf "$INSTALL_DIR/easytier-cli" /usr/bin/easytier-cli 2>/dev/null
 
-    # 将本脚本写入 /usr/local/bin/easytier-menu 方便后续随时调出菜单
-    cp -f "$0" /usr/local/bin/easytier-menu
-    chmod +x /usr/local/bin/easytier-menu
-    ln -sf /usr/local/bin/easytier-menu /usr/local/bin/easytier 2>/dev/null
+    # 【修复点】处理 curl | bash 管道运行时的菜单脚本注册
+    MENU_SCRIPT="${INSTALL_DIR}/easytier-menu.sh"
+    if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "sh" ]; then
+        cp -f "$0" "$MENU_SCRIPT"
+    else
+        echo -e "${BLUE}[*] 正在注册 easytier-menu 快捷命令...${PLAIN}"
+        curl -fsSL "$RAW_SCRIPT_URL" -o "$MENU_SCRIPT" 2>/dev/null || wget -qO "$MENU_SCRIPT" "$RAW_SCRIPT_URL"
+    fi
 
-    echo -e "${GREEN}[+] 核心安装完成！命令行工具 easytier-menu 已注册。${PLAIN}"
+    chmod +x "$MENU_SCRIPT"
+
+    # 创建快捷命令软链接（同时兼容 /usr/local/bin 与 /usr/bin）
+    ln -sf "$MENU_SCRIPT" /usr/local/bin/easytier-menu
+    ln -sf "$MENU_SCRIPT" /usr/local/bin/easytier
+    ln -sf "$MENU_SCRIPT" /usr/bin/easytier-menu 2>/dev/null
+    ln -sf "$MENU_SCRIPT" /usr/bin/easytier 2>/dev/null
+
+    echo -e "${GREEN}[+] 核心安装完成！快捷命令 (easytier / easytier-menu) 注册成功！${PLAIN}"
 }
 
 # 4. 引导配置生成
@@ -340,6 +356,7 @@ uninstall_easytier() {
         systemctl daemon-reload
         rm -rf "$INSTALL_DIR" "$CONF_DIR"
         rm -f /usr/local/bin/easytier-core /usr/local/bin/easytier-cli /usr/local/bin/easytier-menu /usr/local/bin/easytier
+        rm -f /usr/bin/easytier-core /usr/bin/easytier-cli /usr/bin/easytier-menu /usr/bin/easytier
         rm -f /var/log/easytier-watchdog.log
 
         echo -e "${GREEN}[+] EasyTier 已从系统中完全卸载。${PLAIN}"
@@ -434,7 +451,7 @@ show_menu() {
 # 脚本入口处理
 check_root
 
-if [ ! -f "/usr/local/bin/easytier-core" ] || [ ! -f "$CONFIG_FILE" ]; then
+if [ ! -f "/usr/local/bin/easytier-core" ] && [ ! -f "/usr/bin/easytier-core" ]; then
     echo -e "${YELLOW}[*] 检测到系统尚未安装或配置 EasyTier，启动首次安装向导...${PLAIN}"
     install_easytier
     configure_easytier
