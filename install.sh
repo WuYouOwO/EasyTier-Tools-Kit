@@ -3,7 +3,7 @@
 # ================================================================= #
 #  EasyTier Linux 一键安装、引导配置与 Systemd 持久化脚本
 #  支持架构: x86_64, aarch64 (ARM64)
-#  设计目标: 零门槛一键部署, 智能寻路, 自动防坑
+#  修复版: 彻底解决 curl | bash 管道运行下的交互式 read 阻塞与变量报错问题
 # ================================================================= #
 
 # 终端颜色定义
@@ -23,7 +23,7 @@ fi
 echo -e "${BLUE}"
 echo "======================================================"
 echo "    EasyTier Linux 自动部署与引导配置一体化脚本       "
-echo "    作者: Gemini 3.6 或者 3.5 总之肯定是 Flash 因为傻逼 Google 给 人工智能工作室设置了超绝上限导致 3.1 Pro 用不了几下就要求你绑定 Key 了                          "
+echo "    作者: Gemini 3.6 或者 3.5 Falsh                            "
 echo "======================================================"
 echo -e "${PLAIN}"
 
@@ -49,17 +49,18 @@ else
     echo -e "${GREEN}[+] 成功获取最新版本号: $LATEST_VERSION${PLAIN}"
 fi
 
-# 3. 选择下载加速代理
+# 3. 选择下载加速代理（重定向到 /dev/tty 强行等待键盘输入）
 ZIP_NAME="easytier-linux-${ET_ARCH}-${LATEST_VERSION}.zip"
 GITHUB_URL="https://github.com/EasyTier/EasyTier/releases/download/${LATEST_VERSION}/${ZIP_NAME}"
 
 echo -e "${YELLOW}[?] 由于国内直接连接 GitHub 较慢，是否使用加速代理进行下载？${PLAIN}"
 echo "  1) 直连 GitHub 官方 (适合海外 VPS)"
 echo "  2) 使用 ghfast.top 加速代理 (推荐国内节点使用)"
-read -r -p "请选择下载方式 [1-2] (默认: 2): " download_choice
+read -r -p "请选择下载方式 [1-2] (默认: 2): " download_choice < /dev/tty
 download_choice=${download_choice:-2}
 
-if [ "$download_choice" -eq 2 ]; then
+# 使用字符串比较代替整数比较，防止类型转换报错
+if [ "$download_choice" = "2" ]; then
     DOWNLOAD_URL="https://ghfast.top/${GITHUB_URL}"
 else
     DOWNLOAD_URL="${GITHUB_URL}"
@@ -114,37 +115,37 @@ echo "    [4/6] 开始进行引导式组网配置                      "
 echo "======================================================"
 echo -e "${PLAIN}"
 
-# 主机名
+# 主机名（强绑定到 /dev/tty）
 DEFAULT_HOSTNAME=$(hostname)
-read -r -p "▶ 1. 请输入本节点的主机名 [$DEFAULT_HOSTNAME]: " hostname
+read -r -p "▶ 1. 请输入本节点的主机名 [$DEFAULT_HOSTNAME]: " hostname < /dev/tty
 hostname=${hostname:-$DEFAULT_HOSTNAME}
 
 # 虚拟 IP
-read -r -p "▶ 2. 请输入本节点的虚拟 IPv4 物理网卡 IP [例如: 10.10.10.2/24]: " ipv4
+read -r -p "▶ 2. 请输入本节点的虚拟 IPv4 物理网卡 IP [例如: 10.10.10.2/24]: " ipv4 < /dev/tty
 while [ -z "$ipv4" ]; do
-    read -r -p "   [!] 虚拟 IP 不能为空，请重新输入: " ipv4
+    read -r -p "   [!] 虚拟 IP 不能为空，请重新输入: " ipv4 < /dev/tty
 done
 
 # 网络名称
-read -r -p "▶ 3. 请输入虚拟网络名称 [默认: my_easytier_net]: " network_name
+read -r -p "▶ 3. 请输入虚拟网络名称 [默认: my_easytier_net]: " network_name < /dev/tty
 network_name=${network_name:-"my_easytier_net"}
 
 # 密码生成
 RANDOM_SECRET=$(openssl rand -base64 12 2>/dev/null | tr -d '+/=' | cut -c1-12)
 RANDOM_SECRET=${RANDOM_SECRET:-"secure_psk_123"}
-read -r -p "▶ 4. 请输入虚拟网络密码/密钥 [默认随机生成: $RANDOM_SECRET]: " network_secret
+read -r -p "▶ 4. 请输入虚拟网络密码/密钥 [默认随机生成: $RANDOM_SECRET]: " network_secret < /dev/tty
 network_secret=${network_secret:-$RANDOM_SECRET}
 
 # 侦听器
-read -r -p "▶ 5. 本节点是否接收其他节点的主动连接？(Y/n) [默认启用]: " accept_listeners
+read -r -p "▶ 5. 本节点是否接收其他节点的主动连接？(Y/n) [默认启用]: " accept_listeners < /dev/tty
 accept_listeners=${accept_listeners:-"y"}
 
 # 对等节点 (Peer)
 peers_config=""
-read -r -p "▶ 6. 是否需要配置主动连接的 Peer 节点？(y/N) [默认不连接]: " has_peers
+read -r -p "▶ 6. 是否需要配置主动连接的 Peer 节点？(y/N) [默认不连接]: " has_peers < /dev/tty
 if [[ "$has_peers" =~ ^[Yy]$ ]]; then
     while true; do
-        read -r -p "   请输入 Peer 地址 (例如 tcp://1.2.3.4:11010，直接回车结束输入): " peer_uri
+        read -r -p "   请输入 Peer 地址 (例如 tcp://1.2.3.4:11010，直接回车结束输入): " peer_uri < /dev/tty
         [ -z "$peer_uri" ] && break
         peers_config="${peers_config}\n[[peer]]\nuri = \"${peer_uri}\""
     done
@@ -152,10 +153,10 @@ fi
 
 # 子网代理 (Proxy Network)
 proxy_config=""
-read -r -p "▶ 7. 是否需要代理并发布本地物理局域网网段？(y/N) [默认不代理]: " has_proxy
+read -r -p "▶ 7. 是否需要代理并发布本地物理局域网网段？(y/N) [默认不代理]: " has_proxy < /dev/tty
 if [[ "$has_proxy" =~ ^[Yy]$ ]]; then
     while true; do
-        read -r -p "   请输入本地局域网 CIDR (例如 192.168.1.0/24，直接回车结束输入): " proxy_cidr
+        read -r -p "   请输入本地局域网 CIDR (例如 192.168.1.0/24，直接回车结束输入): " proxy_cidr < /dev/tty
         [ -z "$proxy_cidr" ] && break
         proxy_config="${proxy_config}\n[[proxy_network]]\ncidr = \"${proxy_cidr}\""
     done
@@ -207,7 +208,7 @@ if [ -n "$peers_config" ]; then
     echo -e "$peers_config" >> "$CONFIG_FILE"
 fi
 
-# 写入 flags 开关（默认关闭延迟优先，确保在 OSPF 拓扑下能无阻碍直连）
+# 写入 flags 开关
 cat <<EOF >> "$CONFIG_FILE"
 
 [flags]
